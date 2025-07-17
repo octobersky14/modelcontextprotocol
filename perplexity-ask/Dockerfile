@@ -4,7 +4,7 @@ COPY . /app
 
 WORKDIR /app
 
-RUN --mount=type=cache,target=/root/.npm npm install
+RUN npm install
 
 FROM node:22-alpine AS release
 
