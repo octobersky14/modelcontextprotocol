@@ -9,7 +9,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import express from "express";
 import { CallToolRequestSchema, ListToolsRequestSchema, } from "@modelcontextprotocol/sdk/types.js";
 /**
  * Definition of the Perplexity Ask Tool.
@@ -137,7 +138,7 @@ function performChatCompletion(messages_1) {
             model: model, // Model identifier passed as parameter
             messages: messages,
             // Additional parameters can be added here if required (e.g., max_tokens, temperature, etc.)
-            // See the Sonar API documentation for more details: 
+            // See the Sonar API documentation for more details:
             // https://docs.perplexity.ai/api-reference/chat-completions
         };
         let response;
@@ -146,7 +147,7 @@ function performChatCompletion(messages_1) {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${PERPLEXITY_API_KEY}`,
+                    Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
                 },
                 body: JSON.stringify(body),
             });
@@ -173,10 +174,12 @@ function performChatCompletion(messages_1) {
         catch (jsonError) {
             throw new Error(`Failed to parse JSON response from Perplexity API: ${jsonError}`);
         }
-        // Directly retrieve the main message content from the response 
+        // Directly retrieve the main message content from the response
         let messageContent = data.choices[0].message.content;
         // If citations are provided, append them to the message content
-        if (data.citations && Array.isArray(data.citations) && data.citations.length > 0) {
+        if (data.citations &&
+            Array.isArray(data.citations) &&
+            data.citations.length > 0) {
             messageContent += "\n\nCitations:\n";
             data.citations.forEach((citation, index) => {
                 messageContent += `[${index + 1}] ${citation}\n`;
@@ -200,7 +203,11 @@ const server = new Server({
  */
 server.setRequestHandler(ListToolsRequestSchema, () => __awaiter(void 0, void 0, void 0, function* () {
     return ({
-        tools: [PERPLEXITY_ASK_TOOL, PERPLEXITY_RESEARCH_TOOL, PERPLEXITY_REASON_TOOL],
+        tools: [
+            PERPLEXITY_ASK_TOOL,
+            PERPLEXITY_RESEARCH_TOOL,
+            PERPLEXITY_REASON_TOOL,
+        ],
     });
 }));
 /**
@@ -274,25 +281,161 @@ server.setRequestHandler(CallToolRequestSchema, (request) => __awaiter(void 0, v
         };
     }
 }));
-/**
- * Initializes and runs the server using standard I/O for communication.
- * Logs an error and exits if the server fails to start.
- */
-function runServer() {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const transport = new StdioServerTransport();
-            yield server.connect(transport);
-            console.error("Perplexity MCP Server running on stdio with Ask, Research, and Reason tools");
-        }
-        catch (error) {
-            console.error("Fatal error running server:", error);
-            process.exit(1);
-        }
+const app = express();
+app.use(express.json());
+app.get("/", (_, res) => {
+    res.send("Perplexity MCP Server is running!");
+});
+const transports = {};
+// SSE endpoint for client notifications
+app.get("/sse", (_, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const transport = new SSEServerTransport("/messages", res);
+    transports[transport.sessionId] = transport;
+    res.on("close", () => {
+        delete transports[transport.sessionId];
     });
-}
-// Start the server and catch any startup errors
-runServer().catch((error) => {
-    console.error("Fatal error running server:", error);
-    process.exit(1);
+    yield server.connect(transport);
+}));
+// POST endpoint for client messages
+app.post("/messages", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const sessionId = req.query.sessionId;
+    const transport = transports[sessionId];
+    if (transport) {
+        yield transport.handlePostMessage(req, res);
+    }
+    else {
+        res.status(400).send("No transport found for sessionId");
+    }
+}));
+// Direct HTTP endpoint for tool calls (no SSE required)
+app.post("/api/tools/call", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { jsonrpc, method, params } = req.body;
+        if (jsonrpc !== "2.0") {
+            return res.status(400).json({
+                jsonrpc: "2.0",
+                error: {
+                    code: -32600,
+                    message: "Invalid Request: jsonrpc must be '2.0'",
+                },
+                id: null,
+            });
+        }
+        if (method === "tools/call" || method === "tool_code") {
+            const { name, arguments: args } = params;
+            if (!args) {
+                return res.status(400).json({
+                    jsonrpc: "2.0",
+                    error: {
+                        code: -32602,
+                        message: "Invalid params: No arguments provided",
+                    },
+                    id: null,
+                });
+            }
+            let result;
+            switch (name) {
+                case "perplexity_ask": {
+                    if (!Array.isArray(args.messages)) {
+                        return res.status(400).json({
+                            jsonrpc: "2.0",
+                            error: {
+                                code: -32602,
+                                message: "Invalid arguments for perplexity_ask: 'messages' must be an array",
+                            },
+                            id: null,
+                        });
+                    }
+                    const messages = args.messages;
+                    result = yield performChatCompletion(messages, "sonar-pro");
+                    break;
+                }
+                case "perplexity_research": {
+                    if (!Array.isArray(args.messages)) {
+                        return res.status(400).json({
+                            jsonrpc: "2.0",
+                            error: {
+                                code: -32602,
+                                message: "Invalid arguments for perplexity_research: 'messages' must be an array",
+                            },
+                            id: null,
+                        });
+                    }
+                    const messages = args.messages;
+                    result = yield performChatCompletion(messages, "sonar-deep-research");
+                    break;
+                }
+                case "perplexity_reason": {
+                    if (!Array.isArray(args.messages)) {
+                        return res.status(400).json({
+                            jsonrpc: "2.0",
+                            error: {
+                                code: -32602,
+                                message: "Invalid arguments for perplexity_reason: 'messages' must be an array",
+                            },
+                            id: null,
+                        });
+                    }
+                    const messages = args.messages;
+                    result = yield performChatCompletion(messages, "sonar-reasoning-pro");
+                    break;
+                }
+                default:
+                    return res.status(400).json({
+                        jsonrpc: "2.0",
+                        error: {
+                            code: -32601,
+                            message: `Method not found: ${name}`,
+                        },
+                        id: null,
+                    });
+            }
+            return res.json({
+                jsonrpc: "2.0",
+                result: {
+                    content: [{ type: "text", text: result }],
+                    isError: false,
+                },
+                id: null,
+            });
+        }
+        else if (method === "tools/list") {
+            return res.json({
+                jsonrpc: "2.0",
+                result: {
+                    tools: [
+                        PERPLEXITY_ASK_TOOL,
+                        PERPLEXITY_RESEARCH_TOOL,
+                        PERPLEXITY_REASON_TOOL,
+                    ],
+                },
+                id: null,
+            });
+        }
+        else {
+            return res.status(400).json({
+                jsonrpc: "2.0",
+                error: {
+                    code: -32601,
+                    message: `Method not found: ${method}`,
+                },
+                id: null,
+            });
+        }
+    }
+    catch (error) {
+        console.error("Error handling direct API request:", error);
+        return res.status(500).json({
+            jsonrpc: "2.0",
+            error: {
+                code: -32603,
+                message: `Internal error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+            id: null,
+        });
+    }
+}));
+const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
+app.listen(port, () => {
+    console.log(`Perplexity MCP Server running on http://localhost:${port}`);
 });

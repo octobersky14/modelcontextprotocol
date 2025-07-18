@@ -1,59 +1,122 @@
-# Perplexity Ask MCP Server
+# Model Context Protocol (MCP) Servers Collection
 
-An MCP server implementation that integrates the Sonar API to provide Claude with unparalleled real-time, web-wide research.
+A collection of Model Context Protocol (MCP) servers for various AI services and tools. Each server is contained in its own directory with complete documentation and deployment instructions.
 
-Please refer to the official [DeepWiki page](https://deepwiki.com/ppl-ai/modelcontextprotocol) for assistance with implementation. 
+## 🎯 Overview
 
-# High-level System Architecture
+This repository contains multiple MCP servers that can be used with Claude Desktop, Cursor, and other MCP-compatible applications. Each server is self-contained with its own documentation, deployment scripts, and configuration.
 
-*Credits: DeepWiki powered by Devin*
+## 📚 Available Servers
 
-![System Architecture](perplexity-ask/assets/system_architecture.png)
+### 🤖 [Perplexity Ask MCP Server](./perplexity-ask/)
 
+A server that integrates with the Perplexity AI API to provide real-time web search and AI-powered responses.
 
+**Features:**
 
+- Real-time web search using Perplexity's Sonar API
+- Three specialized tools: general questions, deep research, and reasoning
+- Direct HTTP API endpoints for easy integration
+- Full documentation and test scripts
+- Fixed "stream is not readable" error with new `/api/tools/call` endpoint
 
-
-![Demo](perplexity-ask/assets/demo_screenshot.png)
-
-
-## Tools
-
-- **perplexity_ask**
-  - Engage in a conversation with the Sonar API for live web searches.
-  - **Inputs:**
-    - `messages` (array): An array of conversation messages.
-      - Each message must include:
-        - `role` (string): The role of the message (e.g., `system`, `user`, `assistant`).
-        - `content` (string): The content of the message.
-
-## Configuration
-
-### Step 1: 
-
-Clone this repository:
+**Quick Start:**
 
 ```bash
-git clone git@github.com:ppl-ai/modelcontextprotocol.git
+cd perplexity-ask
+./test_api.sh
 ```
 
-Navigate to the `perplexity-ask` directory and install the necessary dependencies:
+**API Endpoint:** `https://perplexity-ask-259175647845.us-central1.run.app/api/tools/call`
 
-```bash
-cd modelcontextprotocol/perplexity-ask && npm install
+**Status:** ✅ Production Ready
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- Docker
+- Google Cloud SDK (for deployment)
+- API keys for the services you want to use
+
+### Installation
+
+1. **Clone the repository:**
+
+   ```bash
+   git clone https://github.com/yourusername/modelcontextprotocol.git
+   cd modelcontextprotocol
+   ```
+
+2. **Choose a server:**
+
+   ```bash
+   cd <server-name>
+   # e.g., cd perplexity-ask
+   ```
+
+3. **Follow the server-specific instructions:**
+   - Each server has its own `README.md` with detailed setup instructions
+   - Check the `GUIDE.md` for comprehensive documentation
+   - Use the `test_api.sh` script to verify everything works
+
+## 🛠️ Server Development
+
+### Adding a New Server
+
+1. **Create a new directory:**
+
+   ```bash
+   mkdir my-new-server
+   cd my-new-server
+   ```
+
+2. **Initialize the project:**
+
+   ```bash
+   npm init
+   npm install @modelcontextprotocol/sdk
+   ```
+
+3. **Create the server files:**
+
+   - `index.ts` - Main server implementation
+   - `README.md` - Overview and quick start
+   - `GUIDE.md` - Comprehensive documentation
+   - `test_api.sh` - Test script
+   - `Dockerfile` - Container configuration
+
+4. **Add to this README:**
+   - Update the "Available Servers" section
+   - Include a brief description and status
+
+### Server Structure
+
+Each server should follow this structure:
+
+```
+server-name/
+├── README.md          # Overview and quick start
+├── GUIDE.md           # Comprehensive documentation
+├── QUICK_REFERENCE.md # Fast reference commands
+├── test_api.sh        # Test script
+├── index.ts           # Main server code
+├── package.json       # Dependencies
+├── tsconfig.json      # TypeScript config
+├── Dockerfile         # Container config
+├── dist/              # Compiled code
+├── node_modules/      # Dependencies
+└── assets/            # Images and resources
 ```
 
-### Step 2: Get a Sonar API Key
+## 🔧 Configuration
 
-1. Sign up for a [Sonar API account](https://docs.perplexity.ai/guides/getting-started).
-2. Follow the account setup instructions and generate your API key from the developer dashboard.
-3. Set the API key in your environment as `PERPLEXITY_API_KEY`.
+### Claude Desktop
 
-### Step 3: Configure Claude Desktop
-
-1. Download Claude desktop [here](https://claude.ai/download). 
-
-2. Add this to your `claude_desktop_config.json`:
+Add servers to your `claude_desktop_config.json`:
 
 ```json
 {
@@ -76,85 +139,90 @@ cd modelcontextprotocol/perplexity-ask && npm install
 }
 ```
 
-### NPX
+### Cursor
 
-```json
-{
-  "mcpServers": {
-    "perplexity-ask": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "server-perplexity-ask"
-      ],
-      "env": {
-        "PERPLEXITY_API_KEY": "YOUR_API_KEY_HERE"
-      }
+1. Open Cursor Settings
+2. Navigate to MCP directory
+3. Add new global MCP server
+4. Use the same configuration as above
+
+### HTTP API Usage
+
+For direct HTTP API access (no MCP client required):
+
+```bash
+# List available tools
+curl -X POST "https://perplexity-ask-259175647845.us-central1.run.app/api/tools/call" \
+-H "Content-Type: application/json" \
+-d '{"jsonrpc": "2.0", "method": "tools/list", "params": {}}'
+
+# Use a tool
+curl -X POST "https://perplexity-ask-259175647845.us-central1.run.app/api/tools/call" \
+-H "Content-Type: application/json" \
+-d '{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "perplexity_ask",
+    "arguments": {
+      "messages": [
+        {"role": "user", "content": "Hello!"}
+      ]
     }
   }
-}
+}'
 ```
 
-You can access the file using:
+## 📋 Server Status
 
-```bash
-vim ~/Library/Application\ Support/Claude/claude_desktop_config.json
-```
+| Server                              | Status              | Description                   | API Endpoint                                                             |
+| ----------------------------------- | ------------------- | ----------------------------- | ------------------------------------------------------------------------ |
+| [perplexity-ask](./perplexity-ask/) | ✅ Production Ready | Perplexity AI API integration | `https://perplexity-ask-259175647845.us-central1.run.app/api/tools/call` |
+| [future-server](./future-server/)   | 🚧 Coming Soon      | Future MCP server             | TBD                                                                      |
 
-### Step 4: Build the Docker Image
+## 🤝 Contributing
 
-Docker build:
+1. **Fork the repository**
+2. **Create a feature branch:** `git checkout -b feature/new-server`
+3. **Add your server** following the structure above
+4. **Update this README** with your server information
+5. **Submit a pull request**
 
-```bash
-docker build -t mcp/perplexity-ask:latest -f Dockerfile .
-```
+### Guidelines
 
-### Step 5: Testing
+- Each server should be self-contained
+- Include comprehensive documentation
+- Provide test scripts
+- Follow the established naming conventions
+- Include deployment instructions
+- Support both MCP and direct HTTP API access
 
-Let's make sure Claude for Desktop is picking up the two tools we've exposed in our `perplexity-ask` server. You can do this by looking for the hammer icon:
+## 📄 License
 
-![Claude Visual Tools](perplexity-ask/assets/visual-indicator-mcp-tools.png)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-After clicking on the hammer icon, you should see the tools that come with the Filesystem MCP Server:
+## 🔗 Resources
 
-![Available Integration](perplexity-ask/assets/available_tools.png)
+- [Model Context Protocol](https://modelcontextprotocol.io/)
+- [Claude Desktop](https://claude.ai/download)
+- [Cursor](https://cursor.sh/)
+- [Perplexity API](https://docs.perplexity.ai/)
 
-If you see both of these this means that the integration is active. Congratulations! This means Claude can now ask Perplexity. You can then simply use it as you would use the Perplexity web app.  
+## 🆘 Support
 
-### Step 6: Advanced parameters
+For issues with specific servers:
 
-Currently, the search parameters used are the default ones. You can modify any search parameter in the API call directly in the `index.ts` script. For this, please refer to the official [API documentation](https://docs.perplexity.ai/api-reference/chat-completions).
+1. Check the server's `GUIDE.md` for troubleshooting
+2. Look at the server's `test_api.sh` for verification
+3. Check the server's logs and documentation
 
-### Troubleshooting 
+For general repository issues:
 
-The Claude documentation provides an excellent [troubleshooting guide](https://modelcontextprotocol.io/docs/tools/debugging) you can refer to. However, you can still reach out to us at api@perplexity.ai for any additional support or [file a bug](https://github.com/ppl-ai/api-discussion/issues). 
+1. Check this README
+2. Review the contributing guidelines
+3. Open an issue with detailed information
 
+---
 
-# Cursor integration
-
-You can also use our MCP with Cursor (or any other app that supports this). To use Sonar with Cursor, you can follow the following steps. 
-
-### Step 1: Navigate to your Cursor settings:
-
-![Cursor Settings](perplexity-ask/assets/cursor-settings.png)
-
-### Step 2: Navigate to the MCP directory
-
-And click on `Add new global MCP server`
-
-![Add Server](perplexity-ask/assets/cursor-mcp-directory.png)
-
-
-### Step 3: Insert the MCP Server Configuration from above 
-
-This is the same configuration you would use for any other application that supports MCP. 
-
-You should then see the application being part of your available tools like this:
-
-![Cursor MCP](perplexity-ask/assets/perplexity-ask-mcp-cursor.png)
-
-
-## License
-
-This MCP server is licensed under the MIT License. This means you are free to use, modify, and distribute the software, subject to the terms and conditions of the MIT License. For more details, please see the LICENSE file in the project repository.
-
+**Repository Status:** 🚧 In Development  
+**Last Updated:** January 2025

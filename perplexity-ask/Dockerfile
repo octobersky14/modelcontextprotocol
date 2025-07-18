@@ -1,21 +1,30 @@
-FROM node:22.12-alpine AS builder
-
-COPY . /app
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-RUN npm install --production=false
+# Copy package files and install all dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy TS config and source code
+COPY tsconfig.json .
+COPY index.ts .
+
+# Build the project
+RUN npm run build
 
 FROM node:22-alpine AS release
 
 WORKDIR /app
 
-COPY --from=builder /app/dist /app/dist
-COPY --from=builder /app/package.json /app/package.json
-COPY --from=builder /app/package-lock.json /app/package-lock.json
+# Copy build artifacts from the builder stage
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/package-lock.json ./package-lock.json
 
 ENV NODE_ENV=production
 
-RUN npm ci --ignore-scripts --omit-dev
+# Install production dependencies only
+RUN npm ci --omit=dev
 
 ENTRYPOINT ["node", "dist/index.js"]
